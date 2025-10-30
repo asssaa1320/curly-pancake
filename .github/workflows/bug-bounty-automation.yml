@@ -129,12 +129,12 @@ jobs:
             echo "Scanning sensitive paths on: $URL" | tee -a results/sensitive_paths.txt
             for path in "${SENSITIVE_PATHS[@]}"; do
               FULL_URL="${URL}${path}"
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$FULL_URL")
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "$FULL_URL" 2>/dev/null || echo "000")
               if [[ "$STATUS" =~ ^(200|201|301|302|401|403)$ ]]; then
                 echo "[${STATUS}] ${FULL_URL}" | tee -a results/sensitive_paths.txt
               fi
             done
-          done
+          done || true
 
       - name: Nuclei Vulnerability Scan
         run: |
