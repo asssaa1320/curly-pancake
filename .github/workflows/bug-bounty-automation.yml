@@ -87,6 +87,30 @@ jobs:
           echo "Starting File Disclosure Scan..." | tee -a results/report.txt
           python scripts/file_disclosure_scanner.py "$TARGET_LIST" | tee -a results/file_disclosure_results.txt
 
+      - name: API Keys and Secrets Scan
+        if: github.event.inputs.scan_type == 'api' || github.event.inputs.scan_type == 'all' || github.event_name == 'schedule'
+        run: |
+          echo "Starting API Keys and Secrets Scan..." | tee -a results/report.txt
+          echo "$TARGET_LIST" | tr ' ' '\n' | while read -r URL; do
+            echo "Scanning: $URL" | tee -a results/secrets_results.txt
+            curl --retry 2 --connect-timeout 8 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -s "$URL" | \
+            grep -E -o '((?<=/)[a-zA-Z0-9\-_\/.:]+(?=/)|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(passw(or)?d|key|secret|token|api[_-]?key|access[_-]?token)\s*[:=]\s*["'\'''][^"'\'']+["'\''])' | \
+            sort -u | tee -a results/secrets_results.txt || true
+          done
+
+      - name: JavaScript Files Analysis
+        if: github.event.inputs.scan_type == 'api' || github.event.inputs.scan_type == 'all' || github.event_name == 'schedule'
+        run: |
+          echo "Starting JavaScript Files Analysis..." | tee -a results/report.txt
+          echo "$TARGET_LIST" | tr ' ' '\n' | while read -r URL; do
+            echo "Analyzing JS files from: $URL" | tee -a results/js_analysis_results.txt
+            curl -s --max-time 8 "$URL" | grep -oE 'src=["'\''](.*?\.js)["'\'']' | cut -d'"' -f2 | sort -u | while read -r js_file; do
+              [[ $js_file != http* ]] && js_file="$URL$js_file"
+              echo "Checking: $js_file" | tee -a results/js_analysis_results.txt
+              curl -s --max-time 8 "$js_file" | grep -E -o '(api|token|key|json\.txt)' && echo "[!] Possible API key in: $js_file" | tee -a results/js_analysis_results.txt || true
+            done
+          done
+
       - name: Nuclei Vulnerability Scan
         run: |
           echo "Running Nuclei Scan..." | tee -a results/report.txt
