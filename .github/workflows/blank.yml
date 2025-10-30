@@ -1,13 +1,14 @@
-name: Advanced Bug Bounty Automation
+name: Bug Bounty Automation
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # كل 6 ساعات
+    - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       target:
         description: 'Target Domain'
         required: true
+        default: 'example.com'
       scan_type:
         description: 'Scan Type'
         required: true
@@ -17,303 +18,105 @@ on:
           - full
           - quick
           - vuln-only
-          - monitor
 
 env:
-  DISCORD_WEBHOOK: \${{ secrets.DISCORD_WEBHOOK }}
   TELEGRAM_TOKEN: \${{ secrets.TELEGRAM_TOKEN }}
-  SLACK_WEBHOOK: \${{ secrets.SLACK_WEBHOOK }}
+  TELEGRAM_CHAT_ID: \${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
   recon:
-    name: Reconnaissance Phase
+    name: Reconnaissance
     runs-on: ubuntu-latest
-    outputs:
-      subdomains: \${{ steps.subfinder.outputs.count }}
-      live_hosts: \${{ steps.httpx.outputs.count }}
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Cache Previous Results
-        uses: actions/cache@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          path: |
-            results/previous
-            .cache
-          key: recon-\${{ github.sha }}
-          restore-keys: |
-            recon-
+          go-version: '1.21'
       
-      - name: Setup Tools
+      - name: Create Results Directory
+        run: mkdir -p results
+      
+      - name: Install Tools
         run: |
-          # Install ProjectDiscovery tools
           go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
           go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-          go install -v github.com/projectdiscovery/katana/cmd/katana@latest
-          
-          # Update Nuclei templates
-          nuclei -update-templates
+          echo "\$HOME/go/bin" >> \$GITHUB_PATH
+      
+      - name: Update Nuclei Templates
+        run: nuclei -update-templates -ut
       
       - name: Subdomain Discovery
-        id: subfinder
         run: |
-          TARGET=\${{ github.event.inputs.target || 'target.com' }}
-          
-          # Multi-source subdomain enumeration
-          subfinder -d $TARGET \\
-            -all \\
-            -recursive \\
-            -o results/subdomains.txt \\
-            -rate-limit 50
-          
-          # Use multiple APIs
-          subfinder -d $TARGET \\
-            -sources censys,shodan,virustotal,securitytrails \\
-            -o results/subdomains_api.txt
-          
-          # Merge and deduplicate
-          cat results/subdomains*.txt | sort -u > results/all_subdomains.txt
-          
-          COUNT=$(wc -l < results/all_subdomains.txt)
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
-          echo "✅ Discovered $COUNT subdomains"
+          TARGET="\${{ github.event.inputs.target }}"
+          echo "Scanning: \$TARGET"
+          subfinder -d "\$TARGET" -all -o results/subdomains.txt || echo "No subdomains found"
+          if [ -f results/subdomains.txt ]; then
+            COUNT=\$(wc -l < results/subdomains.txt)
+            echo "Found \$COUNT subdomains"
+          else
+            echo "0" > results/subdomains.txt
+          fi
       
       - name: Live Host Detection
-        id: httpx
         run: |
-          # Probe for live hosts with tech detection
-          cat results/all_subdomains.txt | httpx \\
-            -silent \\
-            -follow-redirects \\
-            -tech-detect \\
-            -status-code \\
-            -title \\
-            -web-server \\
-            -content-length \\
-            -threads 50 \\
-            -rate-limit 100 \\
-            -o results/live_hosts.txt \\
-            -json -o results/live_hosts.json
-          
-          COUNT=$(wc -l < results/live_hosts.txt)
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
-          echo "✅ Found $COUNT live hosts"
-      
-      - name: Port Scanning
-        if: github.event.inputs.scan_type == 'full'
-        run: |
-          # Fast port scan on live hosts
-          cat results/live_hosts.txt | naabu \\
-            -silent \\
-            -top-ports 1000 \\
-            -rate 1000 \\
-            -o results/open_ports.txt
-          
-          echo "✅ Port scanning completed"
-      
-      - name: Web Crawling
-        if: github.event.inputs.scan_type == 'full'
-        run: |
-          # Crawl websites for endpoints
-          cat results/live_hosts.txt | katana \\
-            -silent \\
-            -depth 3 \\
-            -js-crawl \\
-            -form-extraction \\
-            -known-files all \\
-            -rate-limit 50 \\
-            -o results/endpoints.txt
-          
-          echo "✅ Crawling completed"
-      
-      - name: Upload Recon Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: recon-results
-          path: results/
-          retention-days: 30
-
-  vulnerability-scan:
-    name: Vulnerability Scanning
-    needs: recon
-    runs-on: ubuntu-latest
-    if: needs.recon.outputs.live_hosts > 0
-    
-    steps:
-      - name: Download Recon Results
-        uses: actions/download-artifact@v4
-        with:
-          name: recon-results
-          path: results/
-      
-      - name: Setup Nuclei
-        run: |
-          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-          nuclei -update-templates
-      
-      - name: Critical Vulnerabilities Scan
-        run: |
-          cat results/live_hosts.txt | nuclei \\
-            -silent \\
-            -severity critical,high \\
-            -rate-limit 100 \\
-            -bulk-size 50 \\
-            -timeout 10 \\
-            -retries 2 \\
-            -stats \\
-            -o results/critical_vulns.txt \\
-            -json -o results/critical_vulns.json
-      
-      - name: Medium Vulnerabilities Scan
-        if: github.event.inputs.scan_type == 'full'
-        run: |
-          cat results/live_hosts.txt | nuclei \\
-            -silent \\
-            -severity medium \\
-            -rate-limit 100 \\
-            -o results/medium_vulns.txt \\
-            -json -o results/medium_vulns.json
-      
-      - name: Custom Templates Scan
-        if: github.event.inputs.scan_type == 'full'
-        run: |
-          # Scan with custom templates
-          if [ -d "custom-templates" ]; then
-            cat results/live_hosts.txt | nuclei \\
-              -silent \\
-              -t custom-templates/ \\
-              -o results/custom_scan.txt
+          if [ -s results/subdomains.txt ]; then
+            cat results/subdomains.txt | httpx -silent -o results/live_hosts.txt || echo "No live hosts"
+            if [ -f results/live_hosts.txt ]; then
+              COUNT=\$(wc -l < results/live_hosts.txt)
+              echo "Found \$COUNT live hosts"
+            else
+              echo "0" > results/live_hosts.txt
+            fi
+          else
+            echo "No subdomains to check"
+            echo "0" > results/live_hosts.txt
           fi
       
-      - name: XSS Detection
+      - name: Vulnerability Scan
         run: |
-          go install github.com/hahwul/dalfox/v2@latest
-          
-          # Extract parameters and test for XSS
-          if [ -f "results/endpoints.txt" ]; then
-            cat results/endpoints.txt | \\
-              grep "=" | \\
-              dalfox pipe \\
-                --silence \\
-                --skip-bav \\
-                -o results/xss_findings.txt
+          if [ -s results/live_hosts.txt ] && [ "\$(cat results/live_hosts.txt)" != "0" ]; then
+            cat results/live_hosts.txt | nuclei -silent -severity critical,high -o results/vulns.txt || echo "No vulnerabilities found"
+          else
+            echo "No live hosts to scan"
+            touch results/vulns.txt
           fi
-      
-      - name: Upload Vulnerability Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerability-results
-          path: results/
-          retention-days: 90
-
-  diff-detection:
-    name: Change Detection
-    needs: [recon, vulnerability-scan]
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download Current Results
-        uses: actions/download-artifact@v4
-        with:
-          name: recon-results
-          path: results/current/
-      
-      - name: Load Previous Results
-        uses: actions/cache@v4
-        with:
-          path: results/previous
-          key: previous-results-\${{ github.sha }}
-          restore-keys: |
-            previous-results-
-      
-      - name: Compare Results
-        run: |
-          mkdir -p results/diff
-          
-          # New subdomains
-          if [ -f "results/previous/all_subdomains.txt" ]; then
-            comm -13 \\
-              <(sort results/previous/all_subdomains.txt) \\
-              <(sort results/current/all_subdomains.txt) \\
-              > results/diff/new_subdomains.txt
-            
-            NEW_COUNT=$(wc -l < results/diff/new_subdomains.txt)
-            echo "🆕 New subdomains: $NEW_COUNT"
-          fi
-          
-          # New vulnerabilities
-          if [ -f "results/previous/critical_vulns.txt" ]; then
-            comm -13 \\
-              <(sort results/previous/critical_vulns.txt) \\
-              <(sort results/current/critical_vulns.txt) \\
-              > results/diff/new_vulns.txt
-            
-            VULN_COUNT=$(wc -l < results/diff/new_vulns.txt)
-            echo "🚨 New vulnerabilities: $VULN_COUNT"
-          fi
-      
-      - name: Save Current as Previous
-        run: |
-          rm -rf results/previous
-          cp -r results/current results/previous
-
-  notify:
-    name: Send Notifications
-    needs: [recon, vulnerability-scan, diff-detection]
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download All Results
-        uses: actions/download-artifact@v4
-        with:
-          path: results/
       
       - name: Generate Report
         run: |
-          cat > report.md << EOF
-          # 🎯 Bug Bounty Scan Report
-          
-          **Target:** \${{ github.event.inputs.target || 'target.com' }}
-          **Scan Type:** \${{ github.event.inputs.scan_type || 'full' }}
-          **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S UTC')
-          
-          ## 📊 Statistics
-          - **Subdomains Discovered:** \${{ needs.recon.outputs.subdomains }}
-          - **Live Hosts:** \${{ needs.recon.outputs.live_hosts }}
-          - **Critical Vulnerabilities:** $(wc -l < results/critical_vulns.txt || echo 0)
-          - **New Findings:** $(wc -l < results/diff/new_subdomains.txt || echo 0)
-          
-          ## 🚨 Critical Findings
-          $(head -n 10 results/critical_vulns.txt 2>/dev/null || echo "No critical vulnerabilities found")
-          
-          ## 🔗 Links
-          - [Full Results](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})
-          - [Artifacts Download](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}#artifacts)
-          EOF
-      
-      - name: Send Discord Notification
-        if: env.DISCORD_WEBHOOK != ''
-        run: |
-          curl -X POST "$DISCORD_WEBHOOK" \\
-            -H "Content-Type: application/json" \\
-            -d '{
-              "embeds": [{
-                "title": "🔐 Bug Bounty Scan Completed",
-                "description": "'"$(cat report.md)"'",
-                "color": 3066993,
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
-              }]
-            }'
+          echo "# Bug Bounty Scan Report" > results/report.txt
+          echo "" >> results/report.txt
+          echo "Target: \${{ github.event.inputs.target }}" >> results/report.txt
+          echo "Date: \$(date)" >> results/report.txt
+          echo "" >> results/report.txt
+          echo "Subdomains: \$(wc -l < results/subdomains.txt 2>/dev/null || echo 0)" >> results/report.txt
+          echo "Live Hosts: \$(wc -l < results/live_hosts.txt 2>/dev/null || echo 0)" >> results/report.txt
+          echo "Vulnerabilities: \$(wc -l < results/vulns.txt 2>/dev/null || echo 0)" >> results/report.txt
+          echo "" >> results/report.txt
+          if [ -s results/vulns.txt ]; then
+            echo "Critical Findings:" >> results/report.txt
+            head -n 5 results/vulns.txt >> results/report.txt
+          fi
       
       - name: Send Telegram Notification
         if: env.TELEGRAM_TOKEN != ''
         run: |
-          curl -X POST \\
-            "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \\
-            -d "chat_id=@your_channel" \\
-            -d "text=$(cat report.md)" \\
-            -d "parse_mode=Markdown"`
+          REPORT=\$(cat results/report.txt)
+          curl -s -X POST "https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage" \\
+            -d "chat_id=\${TELEGRAM_CHAT_ID}" \\
+            -d "text=\${REPORT}" \\
+            -d "parse_mode=HTML" || echo "Failed to send notification"
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results
+          path: results/
+          retention-days: 30
+      
+      - name: Display Summary
+        run: cat results/report.txt`
