@@ -47,18 +47,21 @@ jobs:
         run: |
           # Install subfinder for subdomain enumeration
           wget -q https://github.com/projectdiscovery/subfinder/releases/download/v2.6.3/subfinder_2.6.3_linux_amd64.zip
-          unzip -q subfinder_2.6.3_linux_amd64.zip
+          unzip -o -q subfinder_2.6.3_linux_amd64.zip subfinder
           sudo mv subfinder /usr/local/bin/
+          rm -f subfinder_2.6.3_linux_amd64.zip
           
           # Install httpx for probing
           wget -q https://github.com/projectdiscovery/httpx/releases/download/v1.3.7/httpx_1.3.7_linux_amd64.zip
-          unzip -q httpx_1.3.7_linux_amd64.zip
+          unzip -o -q httpx_1.3.7_linux_amd64.zip httpx
           sudo mv httpx /usr/local/bin/
+          rm -f httpx_1.3.7_linux_amd64.zip
           
           # Install nuclei for vulnerability scanning
           wget -q https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip
-          unzip -q nuclei_3.1.0_linux_amd64.zip
+          unzip -o -q nuclei_3.1.0_linux_amd64.zip nuclei
           sudo mv nuclei /usr/local/bin/
+          rm -f nuclei_3.1.0_linux_amd64.zip
 
       - name: Create Results Directory
         run: mkdir -p results
