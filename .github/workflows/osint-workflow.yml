@@ -48,7 +48,12 @@ jobs:
           subfinder -d "\$TARGET" -all -silent -o osint/domains/subfinder.txt || echo "subfinder failed"
           assetfinder --subs-only "\$TARGET" > osint/domains/assetfinder.txt 2>/dev/null || echo "assetfinder failed"
           
-          cat osint/domains/*.txt 2>/dev/null | sort -u > osint/domains/all_subdomains.txt || touch osint/domains/all_subdomains.txt
+          # Merge results safely
+          if ls osint/domains/*.txt 1> /dev/null 2>&1; then
+            cat osint/domains/subfinder.txt osint/domains/assetfinder.txt 2>/dev/null | sort -u > osint/domains/all_subdomains.txt
+          else
+            touch osint/domains/all_subdomains.txt
+          fi
           
           COUNT=\$(wc -l < osint/domains/all_subdomains.txt 2>/dev/null || echo 0)
           echo "Found \$COUNT subdomains"
