@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Cache Previous Results
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             results/previous
@@ -131,7 +131,7 @@ jobs:
           echo "✅ Crawling completed"
       
       - name: Upload Recon Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: recon-results
           path: results/
@@ -145,7 +145,7 @@ jobs:
     
     steps:
       - name: Download Recon Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: recon-results
           path: results/
@@ -204,7 +204,7 @@ jobs:
           fi
       
       - name: Upload Vulnerability Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vulnerability-results
           path: results/
@@ -217,13 +217,13 @@ jobs:
     
     steps:
       - name: Download Current Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: recon-results
           path: results/current/
       
       - name: Load Previous Results
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: results/previous
           key: previous-results-\${{ github.sha }}
@@ -268,7 +268,7 @@ jobs:
     
     steps:
       - name: Download All Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: results/
       
@@ -316,4 +316,4 @@ jobs:
             "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \\
             -d "chat_id=@your_channel" \\
             -d "text=$(cat report.md)" \\
-            -d "parse_mode=Markdown"`;
+            -d "parse_mode=Markdown"`
