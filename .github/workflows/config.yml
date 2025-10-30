@@ -1,0 +1,38 @@
+notifications:
+  discord:
+    webhook_url: \${{ secrets.DISCORD_WEBHOOK }}
+    notify_on:
+      - new_subdomain
+      - critical_vuln
+      - high_vuln
+  
+  telegram:
+    bot_token: \${{ secrets.TELEGRAM_TOKEN }}
+    chat_id: \${{ secrets.TELEGRAM_CHAT_ID }}
+  
+  slack:
+    webhook_url: \${{ secrets.SLACK_WEBHOOK }}
+
+scan_config:
+  rate_limit: 100
+  timeout: 30
+  retries: 3
+  threads: 50
+  
+nuclei:
+  severity:
+    - critical
+    - high
+  exclude_tags:
+    - dos
+    - fuzz
+  
+  custom_templates:
+    - templates/custom/
+    - templates/private/
+
+schedule:
+  full_scan: "0 */6 * * *"      # كل 6 ساعات
+  quick_scan: "0 * * * *"       # كل ساعة
+  vuln_scan: "0 */12 * * *"     # كل 12 ساعة
+  monitoring: "*/30 * * * *"    # كل 30 دقيقة`
