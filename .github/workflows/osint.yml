@@ -1,0 +1,163 @@
+name: OSINT Intelligence Gathering
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Domain'
+        required: true
+        default: 'example.com'
+      osint_type:
+        description: 'OSINT Type'
+        type: choice
+        options:
+          - full
+          - domain-only
+          - email-intel
+
+env:
+  TELEGRAM_TOKEN: \${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: \${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  osint:
+    name: OSINT Gathering
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Create Directories
+        run: mkdir -p osint/{domains,emails,social,tech,dns,certs}
+      
+      - name: Install Tools
+        run: |
+          go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+          go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+          go install github.com/tomnomnom/assetfinder@latest
+          go install github.com/tomnomnom/waybackurls@latest
+          echo "\$HOME/go/bin" >> \$GITHUB_PATH
+      
+      - name: Subdomain Discovery
+        run: |
+          TARGET="\${{ github.event.inputs.target }}"
+          echo "[+] Scanning: \$TARGET"
+          
+          subfinder -d "\$TARGET" -all -o osint/domains/subfinder.txt || true
+          assetfinder --subs-only "\$TARGET" > osint/domains/assetfinder.txt || true
+          
+          cat osint/domains/*.txt | sort -u > osint/domains/all_subdomains.txt
+          echo "Found \$(wc -l < osint/domains/all_subdomains.txt) subdomains"
+      
+      - name: SSL Certificate Intel
+        run: |
+          TARGET="\${{ github.event.inputs.target }}"
+          curl -s "https://crt.sh/?q=%25.\$TARGET&output=json" | \\
+            jq -r '.[].name_value' | sort -u > osint/certs/crtsh.txt || true
+          echo "Found \$(wc -l < osint/certs/crtsh.txt) cert domains"
+      
+      - name: DNS Records
+        run: |
+          if [ -s osint/domains/all_subdomains.txt ]; then
+            cat osint/domains/all_subdomains.txt | \\
+              dnsx -silent -a -aaaa -cname -mx -resp -o osint/dns/records.txt || true
+          fi
+      
+      - name: WHOIS Intelligence
+        run: |
+          TARGET="\${{ github.event.inputs.target }}"
+          whois "\$TARGET" > osint/domains/whois.txt 2>&1 || true
+          
+          grep -Eio '\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b' \\
+            osint/domains/whois.txt | sort -u > osint/emails/whois_emails.txt || true
+      
+      - name: Technology Detection
+        run: |
+          if [ -s osint/domains/all_subdomains.txt ]; then
+            cat osint/domains/all_subdomains.txt | \\
+              httpx -silent -tech-detect -json -o osint/tech/tech.json || true
+            
+            jq -r '.tech[]?' osint/tech/tech.json | \\
+              sort -u > osint/tech/stack.txt || true
+          fi
+      
+      - name: Wayback URLs
+        run: |
+          TARGET="\${{ github.event.inputs.target }}"
+          waybackurls "\$TARGET" > osint/domains/wayback.txt || true
+          
+          cat osint/domains/wayback.txt | \\
+            grep -E '\\.(js|json|xml|conf|config|bak|sql)' | \\
+            sort -u > osint/domains/interesting.txt || true
+      
+      - name: Social Media Check
+        run: |
+          TARGET="\${{ github.event.inputs.target }}"
+          COMPANY=\$(echo "\$TARGET" | cut -d'.' -f1)
+          
+          cat > osint/social/links.txt << EOF
+Twitter: https://twitter.com/\$COMPANY
+LinkedIn: https://linkedin.com/company/\$COMPANY
+GitHub: https://github.com/\$COMPANY
+Facebook: https://facebook.com/\$COMPANY
+EOF
+      
+      - name: Generate Report
+        run: |
+          cat > osint/REPORT.txt << 'EOF'
+════════════════════════════════════════
+OSINT INTELLIGENCE REPORT
+════════════════════════════════════════
+
+Target: \${{ github.event.inputs.target }}
+Date: \$(date)
+
+📊 STATISTICS:
+• Subdomains: \$(wc -l < osint/domains/all_subdomains.txt)
+• Emails: \$(wc -l < osint/emails/whois_emails.txt)
+• Certificates: \$(wc -l < osint/certs/crtsh.txt)
+• Technologies: \$(wc -l < osint/tech/stack.txt)
+• Historical URLs: \$(wc -l < osint/domains/wayback.txt)
+
+🔍 TOP SUBDOMAINS:
+\$(head -n 10 osint/domains/all_subdomains.txt)
+
+📧 EMAILS FOUND:
+\$(head -n 10 osint/emails/whois_emails.txt)
+
+⚙️ TECHNOLOGIES:
+\$(head -n 10 osint/tech/stack.txt)
+
+🔗 Run: \${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}
+════════════════════════════════════════
+EOF
+          cat osint/REPORT.txt
+      
+      - name: Send Telegram
+        if: env.TELEGRAM_TOKEN != ''
+        run: |
+          REPORT=\$(cat osint/REPORT.txt)
+          curl -s -X POST "https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage" \\
+            -d "chat_id=\${TELEGRAM_CHAT_ID}" \\
+            -d "text=\${REPORT}" || true
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: osint-results
+          path: osint/
+          retention-days: 90`
