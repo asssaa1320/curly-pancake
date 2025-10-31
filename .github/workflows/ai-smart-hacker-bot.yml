@@ -779,9 +779,29 @@ jobs:
 <b>🎯 Vulnerabilities Found: {len(data.get('attacks', []))}</b>
 """
                   
+
                   for vuln in data.get('attacks', [])[:10]:  # Top 10
                       report += f"""
 <b>{vuln.get('type', 'Unknown').upper()}</b>
 URL: {vuln.get('url', 'N/A')[:80]}
 Payload: {vuln.get('payload', 'N/A')[:50]}
 """
+
+                  return report
+          
+          if __name__ == "__main__":
+              import sys
+              target = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
+              
+              generator = IntelligentReportGenerator(target)
+              generator.generate_html_report()
+              text_report = generator.generate_text_report()
+              
+              # Save text report
+              with open('ai-bot/reports/telegram_report.txt', 'w', encoding='utf-8') as f:
+                  f.write(text_report)
+              
+              print("[AI] All reports generated!")
+          PYEOF
+          
+          python3 ai-bot/brain/report_generator.py "${{ github.event.inputs.target_url }}" || true
