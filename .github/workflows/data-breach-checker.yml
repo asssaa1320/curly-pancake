@@ -200,6 +200,111 @@ jobs:
                       
                       time.sleep(2)
               
+              def search_local_leaks_folder(self):
+                  """Search in local Leaks folder for txt files"""
+                  import os
+                  import glob
+                  
+                  print(f"[*] Searching local Leaks folder...")
+                  
+                  leaks_folder = 'Leaks'
+                  if not os.path.exists(leaks_folder):
+                      print(f"[!] Leaks folder not found: {leaks_folder}")
+                      return
+                  
+                  # Get all txt files in Leaks folder and subfolders
+                  txt_files = glob.glob(os.path.join(leaks_folder, '**', '*.txt'), recursive=True)
+                  
+                  if not txt_files:
+                      print(f"[!] No txt files found in {leaks_folder}")
+                      return
+                  
+                  print(f"[+] Found {len(txt_files)} txt files to search")
+                  
+                  # Prepare search terms
+                  search_terms = []
+                  if self.email:
+                      search_terms.append(self.email.lower())
+                  if self.username:
+                      search_terms.append(self.username.lower())
+                  if self.phone:
+                      search_terms.append(self.phone)
+                  if self.custom_data:
+                      search_terms.extend([term.strip().lower() for term in self.custom_data])
+                  
+                  if not search_terms:
+                      print("[!] No search terms provided")
+                      return
+                  
+                  total_matches = 0
+                  files_with_matches = []
+                  
+                  # Search each file
+                  for txt_file in txt_files:
+                      try:
+                          file_size = os.path.getsize(txt_file)
+                          
+                          # Skip very large files (>100MB)
+                          if file_size > 100 * 1024 * 1024:
+                              print(f"[!] Skipping large file: {txt_file} ({file_size / 1024 / 1024:.2f}MB)")
+                              continue
+                          
+                          print(f"[*] Searching: {os.path.basename(txt_file)} ({file_size / 1024:.2f}KB)")
+                          
+                          matches_in_file = []
+                          line_numbers = []
+                          
+                          # Read file with multiple encodings
+                          encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                          content = None
+                          
+                          for encoding in encodings:
+                              try:
+                                  with open(txt_file, 'r', encoding=encoding, errors='ignore') as f:
+                                      lines = f.readlines()
+                                      
+                                      for line_num, line in enumerate(lines, 1):
+                                          line_lower = line.lower()
+                                          
+                                          for term in search_terms:
+                                              if term in line_lower:
+                                                  matches_in_file.append({
+                                                      'term': term,
+                                                      'line_number': line_num,
+                                                      'line_content': line.strip()[:200]  # First 200 chars
+                                                  })
+                                                  line_numbers.append(line_num)
+                                                  total_matches += 1
+                                  break
+                              except:
+                                  continue
+                          
+                          if matches_in_file:
+                              files_with_matches.append(txt_file)
+                              
+                              self.results['breaches_found'].append({
+                                  'source': 'Local Leaks Folder',
+                                  'file': os.path.basename(txt_file),
+                                  'full_path': txt_file,
+                                  'matches_count': len(matches_in_file),
+                                  'line_numbers': line_numbers[:10],  # First 10 line numbers
+                                  'sample_matches': matches_in_file[:5]  # First 5 matches
+                              })
+                              
+                              self.results['sources'].append('Local Leaks')
+                              
+                              print(f"[!] FOUND {len(matches_in_file)} matches in {os.path.basename(txt_file)}")
+                              for match in matches_in_file[:3]:  # Show first 3
+                                  print(f"    Line {match['line_number']}: {match['line_content'][:100]}...")
+                      
+                      except Exception as e:
+                          print(f"[!] Error reading {txt_file}: {e}")
+                          continue
+                  
+                  print(f"\n[+] Local search complete!")
+                  print(f"[+] Total matches: {total_matches}")
+                  print(f"[+] Files with matches: {len(files_with_matches)}")
+              
               def calculate_risk_level(self):
                   """Calculate overall risk level"""
                   breach_count = len(self.results['breaches_found'])
@@ -280,6 +385,10 @@ jobs:
                   print("\n" + "="*60)
                   print("🔍 Starting Data Breach Check...")
                   print("="*60 + "\n")
+                  
+                  # Search local Leaks folder first (most important)
+                  self.search_local_leaks_folder()
+                  print("")
                   
                   self.check_leakcheck()
                   time.sleep(1)
