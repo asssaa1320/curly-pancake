@@ -241,31 +241,26 @@ jobs:
               
               def generate_text_report(self, report):
                   """Generate human-readable text report"""
-                  text = f"""
-╔══════════════════════════════════════════════════════════╗
-║         🔍 DATA BREACH CHECKER REPORT 🔍                ║
-╚══════════════════════════════════════════════════════════╝
+                  text = "\n"
+                  text += "╔══════════════════════════════════════════════════════════╗\n"
+                  text += "║         DATA BREACH CHECKER REPORT                ║\n"
+                  text += "╚══════════════════════════════════════════════════════════╝\n\n"
+                  text += " Scan Date: " + report['scan_date'] + "\n\n"
+                  text += " Email: " + report['email'] + "\n"
+                  text += " Username: " + report['username'] + "\n"
+                  text += " Phone: " + report['phone'] + "\n\n"
+                  text += "  RISK LEVEL: " + report['risk_level'] + "\n"
+                  text += " Total Breaches Found: " + str(report['total_breaches']) + "\n\n"
+                  text += "═" * 60 + "\n"
+                  text += "DETAILED FINDINGS:\n"
+                  text += "═" * 60 + "\n\n"
 
-📅 Scan Date: {report['scan_date']}
-
-📧 Email: {report['email']}
-👤 Username: {report['username']}
-📱 Phone: {report['phone']}
-
-⚠️  RISK LEVEL: {report['risk_level']}
-🔢 Total Breaches Found: {report['total_breaches']}
-
-{'═' * 60}
-DETAILED FINDINGS:
-{'═' * 60}
-
-"""
-                  
                   if report['breaches']:
                       for i, breach in enumerate(report['breaches'], 1):
-                          text += f"\n[{i}] {breach.get('source', 'Unknown')}\n"
+                          text += "\n[" + str(i) + "] " + breach.get('source', 'Unknown') + "\n"
                           for key, value in breach.items():
                               if key != 'source':
+                                  text += "    • " + key + ": " + str(value) + "\n"
                                   text += f"    • {key}: {value}\n"
                   else:
                       text += "\n✅ No breaches detected!\n"
