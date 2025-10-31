@@ -762,27 +762,23 @@ jobs:
                   """Generate text report for Telegram"""
                   data = self.load_all_data()
                   
-
-                  report = f'''<b>🤖 AI Smart Hacker Bot Report</b>
-
-<b>Target:</b> {self.target}
-<b>Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
-<b>🧠 Intelligence Summary:</b>
-- URLs Discovered: {data.get('recon', {}).get('urls_discovered', 0)}
-- Forms Found: {data.get('recon', {}).get('forms_found', 0)}
-- APIs Found: {data.get('recon', {}).get('apis_found', 0)}
-- Technologies: {', '.join(data.get('recon', {}).get('technologies', []))}
-
-<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
-<b>🎯 Vulnerabilities Found: {len(data.get('attacks', []))}</b>
-'''
-
-
+                  report = "<b>🤖 AI Smart Hacker Bot Report</b>\n\n"
+                  report += f"<b>Target:</b> {self.target}\n"
+                  report += f"<b>Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                  report += "<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+                  report += "<b>🧠 Intelligence Summary:</b>\n"
+                  report += f"- URLs Discovered: {data.get('recon', {}).get('urls_discovered', 0)}\n"
+                  report += f"- Forms Found: {data.get('recon', {}).get('forms_found', 0)}\n"
+                  report += f"- APIs Found: {data.get('recon', {}).get('apis_found', 0)}\n"
+                  report += f"- Technologies: {', '.join(data.get('recon', {}).get('technologies', []))}\n\n"
+                  report += "<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+                  report += f"<b>🎯 Vulnerabilities Found: {len(data.get('attacks', []))}</b>\n"
+                  
                   for vuln in data.get('attacks', [])[:10]:  # Top 10
-                      report += f'''\n<b>{vuln.get('type', 'Unknown').upper()}</b>\nURL: {vuln.get('url', 'N/A')[:80]}\nPayload: {vuln.get('payload', 'N/A')[:50]}'''
-
+                      report += f"\n<b>{vuln.get('type', 'Unknown').upper()}</b>\n"
+                      report += f"URL: {vuln.get('url', 'N/A')[:80]}\n"
+                      report += f"Payload: {vuln.get('payload', 'N/A')[:50]}\n"
+                  
                   return report
           
           if __name__ == "__main__":
