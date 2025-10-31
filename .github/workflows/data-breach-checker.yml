@@ -1,0 +1,375 @@
+name: Data Breach Checker - كاشف تسريب البيانات
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'البريد الإلكتروني للبحث عنه'
+        required: false
+        default: ''
+      username:
+        description: 'اسم المستخدم للبحث عنه'
+        required: false
+        default: ''
+      phone:
+        description: 'رقم الهاتف للبحث عنه'
+        required: false
+        default: ''
+      custom_data:
+        description: 'بيانات مخصصة أخرى (مفصولة بفواصل)'
+        required: false
+        default: ''
+      search_depth:
+        description: 'عمق البحث'
+        required: true
+        default: 'medium'
+        type: choice
+        options:
+          - quick
+          - medium
+          - deep
+
+env:
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  breach-checker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 aiohttp
+          pip install python-whois dnspython
+          pip install fake-useragent
+
+      - name: Create Breach Checker Structure
+        run: |
+          mkdir -p breach-checker/{results,logs,databases}
+          echo "Data Breach Checker initialized" | tee breach-checker/logs/checker.log
+
+      - name: Advanced Breach Checker Engine
+        run: |
+          cat > breach-checker/breach_checker.py << 'PYEOF'
+          import requests
+          import json
+          import time
+          import re
+          from datetime import datetime
+          from urllib.parse import quote
+          import hashlib
+          
+          class BreachChecker:
+              def __init__(self, email=None, username=None, phone=None, custom_data=None):
+                  self.email = email
+                  self.username = username
+                  self.phone = phone
+                  self.custom_data = custom_data.split(',') if custom_data else []
+                  self.results = {
+                      'breaches_found': [],
+                      'sources': [],
+                      'risk_level': 'Unknown',
+                      'total_leaks': 0
+                  }
+                  self.headers = {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                  }
+              
+              def check_leakcheck(self):
+                  """Check LeakCheck.io"""
+                  if not self.email:
+                      return
+                  
+                  print(f"[*] Checking LeakCheck for: {self.email}")
+                  
+                  try:
+                      url = f"https://leakcheck.io/api/public?check={quote(self.email)}"
+                      response = requests.get(url, headers=self.headers, timeout=10)
+                      
+                      if response.status_code == 200:
+                          data = response.json()
+                          if data.get('found'):
+                              self.results['breaches_found'].append({
+                                  'source': 'LeakCheck',
+                                  'email': self.email,
+                                  'sources': data.get('sources', [])
+                              })
+                              self.results['sources'].append('LeakCheck')
+                              print(f"[+] Found leaks on LeakCheck")
+                          else:
+                              print("[+] No leaks found on LeakCheck")
+                  
+                  except Exception as e:
+                      print(f"[!] Error checking LeakCheck: {e}")
+              
+              def check_intelx(self):
+                  """Check Intelligence X"""
+                  print(f"[*] Checking Intelligence X...")
+                  
+                  try:
+                      if self.email:
+                          url = f"https://2.intelx.io/phonebook/search?k=public&term={quote(self.email)}"
+                          response = requests.get(url, headers=self.headers, timeout=10)
+                          
+                          if response.status_code == 200:
+                              data = response.json()
+                              if data.get('selectors'):
+                                  self.results['breaches_found'].append({
+                                      'source': 'IntelligenceX',
+                                      'email': self.email,
+                                      'count': len(data.get('selectors', []))
+                                  })
+                                  self.results['sources'].append('IntelligenceX')
+                                  print(f"[+] Found {len(data.get('selectors', []))} results on IntelX")
+                  
+                  except Exception as e:
+                      print(f"[!] Error checking IntelX: {e}")
+              
+              def check_pastebin_dumps(self):
+                  """Search for data in Pastebin dumps"""
+                  print(f"[*] Searching Pastebin dumps...")
+                  
+                  search_queries = []
+                  if self.email:
+                      search_queries.append(self.email)
+                  if self.username:
+                      search_queries.append(self.username)
+                  if self.phone:
+                      search_queries.append(self.phone)
+                  
+                  for query in search_queries:
+                      try:
+                          google_query = f'site:pastebin.com "{query}"'
+                          print(f"[*] Searching: {google_query}")
+                          
+                          url = f"https://www.google.com/search?q={quote(google_query)}"
+                          response = requests.get(url, headers=self.headers, timeout=10)
+                          
+                          if query in response.text:
+                              self.results['sources'].append('Pastebin')
+                              self.results['breaches_found'].append({
+                                  'source': 'Pastebin',
+                                  'query': query,
+                                  'status': 'Potential leak detected'
+                              })
+                              print(f"[!] Potential leak found on Pastebin")
+                      
+                      except Exception as e:
+                          print(f"[!] Error searching Pastebin: {e}")
+                      
+                      time.sleep(2)
+              
+              def check_github_leaks(self):
+                  """Search for leaked data on GitHub"""
+                  print(f"[*] Searching GitHub for leaks...")
+                  
+                  search_queries = []
+                  if self.email:
+                      search_queries.append(self.email)
+                  if self.username:
+                      search_queries.append(self.username)
+                  
+                  for query in search_queries:
+                      try:
+                          url = f"https://api.github.com/search/code?q={quote(query)}"
+                          response = requests.get(url, headers=self.headers, timeout=10)
+                          
+                          if response.status_code == 200:
+                              data = response.json()
+                              if data.get('total_count', 0) > 0:
+                                  self.results['breaches_found'].append({
+                                      'source': 'GitHub',
+                                      'query': query,
+                                      'count': data.get('total_count')
+                                  })
+                                  self.results['sources'].append('GitHub')
+                                  print(f"[!] Found {data.get('total_count')} results on GitHub")
+                      
+                      except Exception as e:
+                          print(f"[!] Error searching GitHub: {e}")
+                      
+                      time.sleep(2)
+              
+              def calculate_risk_level(self):
+                  """Calculate overall risk level"""
+                  breach_count = len(self.results['breaches_found'])
+                  
+                  if breach_count == 0:
+                      self.results['risk_level'] = '✅ Low - No breaches found'
+                  elif breach_count <= 2:
+                      self.results['risk_level'] = '⚠️ Medium - Few breaches detected'
+                  elif breach_count <= 5:
+                      self.results['risk_level'] = '🔴 High - Multiple breaches found'
+                  else:
+                      self.results['risk_level'] = '🚨 Critical - Extensive data exposure'
+                  
+                  self.results['total_leaks'] = breach_count
+              
+              def generate_report(self):
+                  """Generate detailed report"""
+                  self.calculate_risk_level()
+                  
+                  report = {
+                      'scan_date': datetime.now().isoformat(),
+                      'email': self.email if self.email else 'N/A',
+                      'username': self.username if self.username else 'N/A',
+                      'phone': self.phone if self.phone else 'N/A',
+                      'risk_level': self.results['risk_level'],
+                      'total_breaches': self.results['total_leaks'],
+                      'breaches': self.results['breaches_found'],
+                      'sources': list(set(self.results['sources']))
+                  }
+                  
+                  with open('breach-checker/results/breach_report.json', 'w', encoding='utf-8') as f:
+                      json.dump(report, f, indent=2, ensure_ascii=False)
+                  
+                  text_report = self.generate_text_report(report)
+                  with open('breach-checker/results/breach_report.txt', 'w', encoding='utf-8') as f:
+                      f.write(text_report)
+                  
+                  return report
+              
+              def generate_text_report(self, report):
+                  """Generate human-readable text report"""
+                  text = f"""
+╔══════════════════════════════════════════════════════════╗
+║         🔍 DATA BREACH CHECKER REPORT 🔍                ║
+╚══════════════════════════════════════════════════════════╝
+
+📅 Scan Date: {report['scan_date']}
+
+📧 Email: {report['email']}
+👤 Username: {report['username']}
+📱 Phone: {report['phone']}
+
+⚠️  RISK LEVEL: {report['risk_level']}
+🔢 Total Breaches Found: {report['total_breaches']}
+
+{'═' * 60}
+DETAILED FINDINGS:
+{'═' * 60}
+
+"""
+                  
+                  if report['breaches']:
+                      for i, breach in enumerate(report['breaches'], 1):
+                          text += f"\n[{i}] {breach.get('source', 'Unknown')}\n"
+                          for key, value in breach.items():
+                              if key != 'source':
+                                  text += f"    • {key}: {value}\n"
+                  else:
+                      text += "\n✅ No breaches detected!\n"
+                  
+                  text += f"\n{'═' * 60}\n"
+                  text += "\n⚠️  RECOMMENDATIONS:\n"
+                  text += "1. Change passwords for all affected accounts\n"
+                  text += "2. Enable 2FA (Two-Factor Authentication)\n"
+                  text += "3. Monitor your accounts for suspicious activity\n"
+                  text += "4. Consider using a password manager\n"
+                  text += "5. Check your credit report regularly\n"
+                  
+                  return text
+              
+              def run_full_scan(self):
+                  """Run complete breach check"""
+                  print("\n" + "="*60)
+                  print("🔍 Starting Data Breach Check...")
+                  print("="*60 + "\n")
+                  
+                  self.check_leakcheck()
+                  time.sleep(1)
+                  
+                  self.check_intelx()
+                  time.sleep(1)
+                  
+                  self.check_pastebin_dumps()
+                  time.sleep(1)
+                  
+                  self.check_github_leaks()
+                  
+                  report = self.generate_report()
+                  
+                  print("\n" + "="*60)
+                  print("✅ Scan Complete!")
+                  print("="*60)
+                  print(f"\nRisk Level: {report['risk_level']}")
+                  print(f"Total Breaches: {report['total_breaches']}")
+                  
+                  return report
+          
+          if __name__ == "__main__":
+              import sys
+              
+              email = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != '' else None
+              username = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != '' else None
+              phone = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] != '' else None
+              custom = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] != '' else None
+              
+              if not any([email, username, phone, custom]):
+                  print("[!] Error: Please provide at least one search parameter")
+                  sys.exit(1)
+              
+              checker = BreachChecker(
+                  email=email,
+                  username=username,
+                  phone=phone,
+                  custom_data=custom
+              )
+              
+              report = checker.run_full_scan()
+          PYEOF
+          
+          python3 breach-checker/breach_checker.py \
+            "${{ github.event.inputs.email }}" \
+            "${{ github.event.inputs.username }}" \
+            "${{ github.event.inputs.phone }}" \
+            "${{ github.event.inputs.custom_data }}" || true
+
+      - name: Generate Telegram Report
+        if: always()
+        run: |
+          if [ -f breach-checker/results/breach_report.json ]; then
+            RISK_LEVEL=$(jq -r '.risk_level' breach-checker/results/breach_report.json)
+            TOTAL_BREACHES=$(jq -r '.total_breaches' breach-checker/results/breach_report.json)
+            EMAIL=$(jq -r '.email' breach-checker/results/breach_report.json)
+            
+            REPORT="<b>🔍 Data Breach Check Results</b>\n\n"
+            REPORT+="<b>📧 Email:</b> ${EMAIL}\n"
+            REPORT+="<b>⚠️ Risk Level:</b> ${RISK_LEVEL}\n"
+            REPORT+="<b>🔢 Total Breaches:</b> ${TOTAL_BREACHES}\n\n"
+            REPORT+="Check artifacts for detailed report."
+            
+            echo "BREACH_REPORT<<EOF" >> $GITHUB_ENV
+            echo "$REPORT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
+
+      - name: Send Telegram Notification
+        if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+        run: |
+          if [ ! -z "${BREACH_REPORT}" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_CHAT_ID}" \
+              -d parse_mode="HTML" \
+              -d text="${BREACH_REPORT}" || echo "Failed to send notification"
+          fi
+
+      - name: Upload Breach Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: breach-check-reports
+          path: |
+            breach-checker/results/
+            breach-checker/logs/
+          retention-days: 30
