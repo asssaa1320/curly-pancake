@@ -784,8 +784,7 @@ jobs:
                       report += f"""
 <b>{vuln.get('type', 'Unknown').upper()}</b>
 URL: {vuln.get('url', 'N/A')[:80]}
-Payload: {vuln.get('payload', 'N/A')[:50]}
-"""
+Payload: {vuln.get('payload', 'N/A')[:50]} """
 
                   return report
           
@@ -805,3 +804,29 @@ Payload: {vuln.get('payload', 'N/A')[:50]}
           PYEOF
           
           python3 ai-bot/brain/report_generator.py "${{ github.event.inputs.target_url }}" || true
+
+      - name: Send Telegram Notification
+        if: env.TELEGRAM_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+        run: |
+          # Read the generated report
+          if [ -f ai-bot/reports/telegram_report.txt ]; then
+            REPORT=$(cat ai-bot/reports/telegram_report.txt)
+          else
+            REPORT="🤖 AI Smart Hacker Bot Scan Complete!\n\nTarget: ${{ github.event.inputs.target_url }}\nIntelligence Level: ${{ github.event.inputs.intelligence_level }}\n\nCheck artifacts for detailed reports."
+          fi
+          
+          # Send to Telegram
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            -d text="${REPORT}" || echo "Failed to send Telegram notification"
+
+      - name: Upload Reports as Artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ai-hacker-reports
+          path: |
+            ai-bot/reports/
+            ai-bot/memory/
+          retention-days: 30
