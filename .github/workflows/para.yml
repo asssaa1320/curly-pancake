@@ -43,10 +43,8 @@ jobs:
       run: |
         # Change to the ParamSpider directory
         cd ParamSpider
-        # Install in development mode
-        pip3 install -e .
-        # Run ParamSpider with correct syntax
-        python3 paramspider.py -d ${{ github.event.inputs.target }} -o /tmp/
+        # Run ParamSpider using the module directly
+        python3 -m paramspider -d ${{ github.event.inputs.target }} -o /tmp/
         # The output will be in /tmp/panasonic.aero.txt
         OUTPUT_FILE="/tmp/${{ github.event.inputs.target }}.txt"
         
