@@ -30,17 +30,18 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y git python3-pip
-        # Install ParamSpider directly from GitHub with its dependencies
-        pip3 install git+https://github.com/devanshbatham/ParamSpider
+        # Clone ParamSpider repository
+        git clone https://github.com/devanshbatham/ParamSpider
+        cd ParamSpider
+        # Install requirements
+        pip3 install -r requirements.txt
         # Install additional required packages
         pip3 install requests
 
     - name: Run ParamSpider
       id: paramspider
       run: |
-        # Install ParamSpider in development mode to make the command available
-        cd $(python3 -c "import site; print(site.getsitepackages()[0])")
-        cd paramspider
+        cd ParamSpider
         python3 paramspider.py -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
         
         if [ -s "/tmp/paramspider_output.txt" ]; then
