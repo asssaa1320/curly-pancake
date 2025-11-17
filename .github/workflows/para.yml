@@ -42,11 +42,11 @@ jobs:
       id: paramspider
       run: |
         # Change to the ParamSpider directory
-        cd $GITHUB_WORKSPACE/ParamSpider
-        # Make the script executable
-        chmod +x paramspider.py
-        # Run ParamSpider with the specified parameters
-        python3 paramspider.py -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
+        cd ParamSpider
+        # Install in development mode
+        pip3 install -e .
+        # Run ParamSpider directly
+        paramspider -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
         
         if [ -s "/tmp/paramspider_output.txt" ]; then
           echo "paramspider_output=$(cat /tmp/paramspider_output.txt | base64 -w 0)" >> $GITHUB_OUTPUT
