@@ -45,11 +45,15 @@ jobs:
         cd ParamSpider
         # Install in development mode
         pip3 install -e .
-        # Run ParamSpider directly
-        paramspider -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
+        # Run ParamSpider with correct syntax
+        python3 paramspider.py -d ${{ github.event.inputs.target }} -o /tmp/
+        # The output will be in /tmp/panasonic.aero.txt
+        OUTPUT_FILE="/tmp/${{ github.event.inputs.target }}.txt"
         
-        if [ -s "/tmp/paramspider_output.txt" ]; then
-          echo "paramspider_output=$(cat /tmp/paramspider_output.txt | base64 -w 0)" >> $GITHUB_OUTPUT
+        if [ -s "$OUTPUT_FILE" ]; then
+          echo "paramspider_output=$(cat $OUTPUT_FILE | base64 -w 0)" >> $GITHUB_OUTPUT
+          # Copy to the expected location for the next steps
+          cp $OUTPUT_FILE /tmp/paramspider_output.txt
         else
           echo "No parameters found"
           echo "paramspider_output=No parameters found" >> $GITHUB_OUTPUT
