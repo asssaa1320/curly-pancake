@@ -30,15 +30,15 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y git python3-pip
-        git clone https://github.com/devanshbatham/ParamSpider
-        cd ParamSpider
-        pip3 install -r requirements.txt
+        # Install ParamSpider directly from GitHub with its dependencies
+        pip3 install git+https://github.com/devanshbatham/ParamSpider
+        # Install additional required packages
         pip3 install requests
 
     - name: Run ParamSpider
       id: paramspider
       run: |
-        cd ParamSpider
+        # No need to clone ParamSpider repository as it's already installed
         python3 paramspider.py -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
         
         if [ -s "/tmp/paramspider_output.txt" ]; then
