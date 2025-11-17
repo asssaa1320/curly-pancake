@@ -30,23 +30,18 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y git python3-pip
-        # Clone ParamSpider repository
-        git clone https://github.com/devanshbatham/ParamSpider
-        cd ParamSpider
-        # Install required packages
-        pip3 install requests urllib3 bs4 argparse
-        # Install additional required packages
-        pip3 install requests
+        # Install ParamSpider globally
+        pip3 install paramspider
 
     - name: Run ParamSpider
       id: paramspider
       run: |
-        # Change to the ParamSpider directory
-        cd ParamSpider
-        # Run ParamSpider using the module directly
-        python3 -m paramspider -d ${{ github.event.inputs.target }} -o /tmp/
-        # The output will be in /tmp/panasonic.aero.txt
-        OUTPUT_FILE="/tmp/${{ github.event.inputs.target }}.txt"
+        # Create output directory
+        mkdir -p /tmp/paramspider_output
+        # Run ParamSpider
+        paramspider -d ${{ github.event.inputs.target }} -o /tmp/paramspider_output/
+        # The output will be in /tmp/paramspider_output/panasonic.aero.txt
+        OUTPUT_FILE="/tmp/paramspider_output/${{ github.event.inputs.target }}.txt"
         
         if [ -s "$OUTPUT_FILE" ]; then
           echo "paramspider_output=$(cat $OUTPUT_FILE | base64 -w 0)" >> $GITHUB_OUTPUT
@@ -56,7 +51,6 @@ jobs:
           echo "No parameters found"
           echo "paramspider_output=No parameters found" >> $GITHUB_OUTPUT
         fi
-
     - name: Test for vulnerabilities
       id: test_vulns
       run: |
