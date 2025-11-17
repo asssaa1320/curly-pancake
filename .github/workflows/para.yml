@@ -38,7 +38,9 @@ jobs:
     - name: Run ParamSpider
       id: paramspider
       run: |
-        # No need to clone ParamSpider repository as it's already installed
+        # Install ParamSpider in development mode to make the command available
+        cd $(python3 -c "import site; print(site.getsitepackages()[0])")
+        cd paramspider
         python3 paramspider.py -d ${{ github.event.inputs.target }} --level ${{ github.event.inputs.depth }} -o /tmp/paramspider_output.txt
         
         if [ -s "/tmp/paramspider_output.txt" ]; then
