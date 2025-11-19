@@ -46,17 +46,11 @@ jobs:
       run: |
         git clone https://github.com/0xKayala/NucleiFuzzer.git || echo "NucleiFuzzer clone failed, continuing..."
         
-    - name: Test pocsuite3
-      run: |
-        echo "Testing pocsuite3 installation..."
-        python -c "import pocsuite3; print('pocsuite3 installed successfully')" || echo "pocsuite3 not found"
-        
     - name: Run pocsuite3 scan
       if: ${{ github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'pocsuite3_only' || github.event.inputs.scan_type == '' }}
       run: |
         echo "Starting pocsuite3 scan on ${{ github.event.inputs.target_url }}"
         
-        # Try pocsuite3 command first
         if command -v pocsuite3 &> /dev/null; then
           echo "Using pocsuite3 command..."
           timeout 300 pocsuite3 -u "${{ github.event.inputs.target_url }}" --format json --threads 10 > pocsuite3_results.json 2>&1 || echo "pocsuite3 command failed"
@@ -66,7 +60,6 @@ jobs:
         fi
         
         echo "pocsuite3 scan completed"
-        ls -la pocsuite3_results.json 2>/dev/null || echo "No pocsuite3 results file created"
         
     - name: Run NucleiFuzzer scan
       if: ${{ github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'nucleifuzzer_only' }}
@@ -75,10 +68,6 @@ jobs:
         
         if [ -d "NucleiFuzzer" ]; then
           cd NucleiFuzzer
-          echo "NucleiFuzzer directory contents:"
-          ls -la
-          
-          # Look for the main script
           if [ -f "nucleifuzzer.py" ]; then
             echo "Found nucleifuzzer.py"
             timeout 600 python3 nucleifuzzer.py -u "${{ github.event.inputs.target_url }}" -o ../nucleifuzzer_results.json > ../nucleifuzzer_output.log 2>&1 || echo "nucleifuzzer.py failed"
@@ -96,7 +85,6 @@ jobs:
         fi
         
         echo "NucleiFuzzer scan completed"
-        ls -la nucleifuzzer_results.json 2>/dev/null || echo "No nucleifuzzer results file created"
         
     - name: Create scan report
       run: |
@@ -110,7 +98,6 @@ jobs:
         echo "**Scanner:** GitHub Actions" >> scan_report.md
         echo "" >> scan_report.md
         
-        # Add pocsuite3 results
         if [ -f "pocsuite3_results.json" ] && [ -s "pocsuite3_results.json" ]; then
           echo "## pocsuite3 Results" >> scan_report.md
           echo "" >> scan_report.md
@@ -125,7 +112,6 @@ jobs:
           echo "" >> scan_report.md
         fi
         
-        # Add NucleiFuzzer results
         if [ -f "nucleifuzzer_results.json" ] && [ -s "nucleifuzzer_results.json" ]; then
           echo "## NucleiFuzzer Results" >> scan_report.md
           echo "" >> scan_report.md
@@ -140,7 +126,6 @@ jobs:
           echo "" >> scan_report.md
         fi
         
-        # Add summary
         echo "## Summary" >> scan_report.md
         echo "" >> scan_report.md
         echo "- **pocsuite3:** $([ -f "pocsuite3_results.json" ] && [ -s "pocsuite3_results.json" ] && echo "Completed" || echo "Failed")" >> scan_report.md
@@ -148,7 +133,6 @@ jobs:
         echo "" >> scan_report.md
         
         echo "Report created successfully"
-        cat scan_report.md
         
     - name: Send Telegram notification
       if: ${{ vars.TELEGRAM_BOT_TOKEN != '' && vars.TELEGRAM_CHAT_ID != '' }}
@@ -158,39 +142,16 @@ jobs:
       run: |
         echo "Sending Telegram notification..."
         
-        # Determine scan results
         POCSUITE3_STATUS=$([ -f "pocsuite3_results.json" ] && [ -s "pocsuite3_results.json" ] && echo "Success" || echo "Failed")
         NUCLEIFUZZER_STATUS=$([ -f "nucleifuzzer_results.json" ] && [ -s "nucleifuzzer_results.json" ] && echo "Success" || echo "Failed")
         
-        # Create message
-        MESSAGE="**Security Scan Report**
-
-**Target:** ${{ github.event.inputs.target_url }}
-**Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-**Scanner:** GitHub Actions
-
-**Results:**
-**pocsuite3:** $POCSUITE3_STATUS
-**NucleiFuzzer:** $NUCLEIFUZZER_STATUS
-
-**Workflow:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-**Report:** Available in artifacts"
-        
-        echo "Sending message to Telegram..."
-        echo "Bot Token: ${BOT_TOKEN:0:10}..."
-        echo "Chat ID: $CHAT_ID"
-        
-        # Send to Telegram
         curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
           -H "Content-Type: application/json" \
           -d "{
             \"chat_id\": \"${CHAT_ID}\",
-            \"text\": \"$MESSAGE\",
+            \"text\": \"**Security Scan Report**\\n\\n**Target:** ${{ github.event.inputs.target_url }}\\n**Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')\\n**Scanner:** GitHub Actions\\n\\n**Results:**\\n**pocsuite3:** ${POCSUITE3_STATUS}\\n**NucleiFuzzer:** ${NUCLEIFUZZER_STATUS}\\n\\n**Workflow:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\\n\\n**Report:** Available in artifacts\",
             \"parse_mode\": \"Markdown\"
           }" || echo "Failed to send Telegram message"
-        
-        echo "Telegram notification completed"
         
     - name: Upload results
       uses: actions/upload-artifact@v4
