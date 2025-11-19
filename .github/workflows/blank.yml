@@ -54,9 +54,9 @@ jobs:
     - name: Run pocsuite3 scan
       if: ${{ github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'pocsuite3_only' || github.event.inputs.scan_type == '' }}
       run: |
-        echo "=== Starting pocsuite3 scan on ${{ github.event.inputs.target_url }} ==="
+        echo "Starting pocsuite3 scan on ${{ github.event.inputs.target_url }}"
         
-        # Try different pocsuite3 commands
+        # Try pocsuite3 command first
         if command -v pocsuite3 &> /dev/null; then
           echo "Using pocsuite3 command..."
           timeout 300 pocsuite3 -u "${{ github.event.inputs.target_url }}" --format json --threads 10 > pocsuite3_results.json 2>&1 || echo "pocsuite3 command failed"
@@ -71,7 +71,7 @@ jobs:
     - name: Run NucleiFuzzer scan
       if: ${{ github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'nucleifuzzer_only' }}
       run: |
-        echo "=== Starting NucleiFuzzer scan on ${{ github.event.inputs.target_url }} ==="
+        echo "Starting NucleiFuzzer scan on ${{ github.event.inputs.target_url }}"
         
         if [ -d "NucleiFuzzer" ]; then
           cd NucleiFuzzer
@@ -100,17 +100,15 @@ jobs:
         
     - name: Create scan report
       run: |
-        echo "=== Creating scan report ==="
+        echo "Creating scan report..."
         
-        cat > scan_report.md << EOF
-# Security Scan Report
-
-**Target:** ${{ github.event.inputs.target_url }}
-**Scan Type:** ${{ github.event.inputs.scan_type || 'full' }}
-**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-**Scanner:** GitHub Actions
-
-EOF
+        echo "# Security Scan Report" > scan_report.md
+        echo "" >> scan_report.md
+        echo "**Target:** ${{ github.event.inputs.target_url }}" >> scan_report.md
+        echo "**Scan Type:** ${{ github.event.inputs.scan_type || 'full' }}" >> scan_report.md
+        echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> scan_report.md
+        echo "**Scanner:** GitHub Actions" >> scan_report.md
+        echo "" >> scan_report.md
         
         # Add pocsuite3 results
         if [ -f "pocsuite3_results.json" ] && [ -s "pocsuite3_results.json" ]; then
@@ -158,7 +156,7 @@ EOF
         BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
-        echo "=== Sending Telegram notification ==="
+        echo "Sending Telegram notification..."
         
         # Determine scan results
         POCSUITE3_STATUS=$([ -f "pocsuite3_results.json" ] && [ -s "pocsuite3_results.json" ] && echo "Success" || echo "Failed")
@@ -177,7 +175,7 @@ EOF
 
 **Workflow:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-**Files:** Available in artifacts"
+**Report:** Available in artifacts"
         
         echo "Sending message to Telegram..."
         echo "Bot Token: ${BOT_TOKEN:0:10}..."
